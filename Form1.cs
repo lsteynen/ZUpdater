@@ -78,6 +78,11 @@ namespace Updater
                 this.Text = config.title;
             }
 
+            // Process the options
+            IsDebug = config.debug;
+            IsShowError = config.showerror;
+            IsShowNoupdate = config.shownoupdate;
+
             // TODO: -v versienr van command line nemen, dan die van xml negeren
             // TODO: -d debug vlag van command line OR die van XML
             // TODO: -e sayerror vlag van command line OR die van XML
@@ -173,6 +178,8 @@ namespace Updater
             {
                 Log("** No update is available");
             }
+
+            Log("Finished");
 
             // Terminate this updater
             // If we're not in debug mode
