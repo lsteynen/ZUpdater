@@ -21,10 +21,13 @@ namespace Updater
         public string version
         { get; set; }
 
-        public string title
+        public string caption
         { get; set; }
 
         public string name
+        { get; set; }
+
+        public string processname
         { get; set; }
 
         public string url
@@ -43,8 +46,9 @@ namespace Updater
             Config tmpconfig = xs.Deserialize(sr) as Config;
             this.debug = tmpconfig.debug;
             this.version = tmpconfig.version;
-            this.title = tmpconfig.title;
+            this.caption = tmpconfig.caption;
             this.name = tmpconfig.name;
+            this.processname = tmpconfig.processname;
             this.url = tmpconfig.url;
             this.showerror = tmpconfig.showerror;
             this.shownoupdate = tmpconfig.shownoupdate;
