@@ -6,6 +6,7 @@ using System.Net;
 using System.IO;
 using System.Xml;
 using System.Diagnostics;
+using CmdLine;
 
 namespace Updater
 {
@@ -18,27 +19,69 @@ namespace Updater
         private bool IsShowError = true;
         private bool IsShowNoupdate = true;
 
-        // TODO: gebruik IsDebug
-        // TODO: IsShowError
         // TODO: onderscheid maken tussen configuratiefout en communicatiefouten?
-        //       default configuratiefout wel tonen maar communicatiefouten niet?
-        // TODO: IsShowNoupdate: messagebox tonen als er geen update is
-
-        // TODO: alles hiden als niet debug?
-        // TODO: tonen als IsShowError en error
+        //       default configuratiefouten wel tonen maar communicatiefouten niet?
 
         public Form1()
         {
             InitializeComponent();
+
+            // Start the updater hidden
+            this.WindowState = FormWindowState.Minimized;
+            this.ShowInTaskbar = false;
+        }
+
+        // Before form display
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            // Show version in log
+            Version v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            Log("Updater v" + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision);
+
+            // Process the command line
+            // Updater [-v 1.15.8] [-d] [-e] [-n]
+            CmdLine.CmdLine c = new CmdLine.CmdLine();
+            // In winforms we get the executable as the first argument. Handle it as a fixed first argument.
+            CmdLineString ArgExecutable = new CmdLineString("Executable", eUsage.Fixed, "Executable");
+            CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
+            CmdLineSwitch ArgDebug = new CmdLineSwitch("d", eUsage.Optional, "Show debug output");
+            CmdLineSwitch ArgShowErrors = new CmdLineSwitch("e", eUsage.Optional, "Show info window on error");
+            CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' dialog");
+
+            c.RegisterParameter(ArgExecutable);
+            c.RegisterParameter(ArgAppCurrentVersion);
+            c.RegisterParameter(ArgDebug);
+            c.RegisterParameter(ArgShowErrors);
+            c.RegisterParameter(ArgShowNoUpdate);
+
+            // get command line parameters
+            string[] args = Environment.GetCommandLineArgs();
+            try
+            {
+                c.Parse(args);
+            }
+            catch (Exception ex)
+            {
+                Error("Command line error. " + ex.Message);
+                return;
+            }
+
+            // Set global parameters to arguments
+            if (ArgAppCurrentVersion.Exists) MyVersion = ArgAppCurrentVersion.Value;
+            IsDebug = ArgDebug.Exists;
+            IsShowError = ArgShowErrors.Exists;
+            IsShowNoupdate = ArgShowNoUpdate.Exists;
+
+            // In debug mode? Then show the main window
+            if (IsDebug)
+            {
+                ShowMe();
+            }
         }
 
         // After form is shown
         private void Form1_Shown(object sender, EventArgs e)
         {
-            // Show version
-            Version v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            Log("Updater v" + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision); 
-
             // Load config file
             // From the same location as this exe
 
@@ -61,7 +104,10 @@ namespace Updater
             }
             catch(Exception ex)
             {
-                Log("Error: Could not load config file " + configfileName + ". " + ex.Message);
+                Error("Error: Could not load config file " + configfileName + ". " + ex.Message);
+
+                // Not in debug mode? Then terminate on return
+                if (IsDebug == false) Application.Exit();
                 return;
             }
 
@@ -77,22 +123,41 @@ namespace Updater
             // TODO: -n saynoupdate vlag van command line OR die van XML
 
             // Process the options
-            MyVersion = config.version;
-            IsDebug = config.debug;
-            IsShowError = config.showerror;
-            IsShowNoupdate = config.shownoupdate;
+            // if no version given on command line: then take version from xml file
+            if( MyVersion == null) MyVersion = config.version;
+            IsDebug |= config.debug;
+            IsShowError |= config.showerror;
+            IsShowNoupdate |= config.shownoupdate;
 
+            // In debug mode? Then show the main window
+            if (IsDebug)
+            {
+                ShowMe();
+            }
+
+            // Do everything
+            Work();
+
+            Log("Finished");
+
+            // Not in debug mode? Then terminate on return
+            if (IsDebug == false) Application.Exit();
+        }
+
+        private void Work()
+        {
             // Check if we have a local version number
             if (String.IsNullOrEmpty(MyVersion.Trim()))
             {
-                Log("Error: Version number is missing");
+                Error("Error: Version number is missing");
                 return;
             }
 
             // Check if we have a url
-            if (String.IsNullOrEmpty(config.url.Trim()))
+            if (String.IsNullOrEmpty(config.url)
+               || (config.url.Trim() == String.Empty))
             {
-                Log("Error: Server URL is missing");
+                Error("Error: Server URL is missing");
                 return;
             }
 
@@ -108,7 +173,7 @@ namespace Updater
             catch (Exception ex)
             {
                 string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                Log("Error: Could not download remote xml file. " + err);
+                Error("Error: Could not download remote xml file. " + err);
                 return;
             }
             wc.Dispose();
@@ -119,8 +184,8 @@ namespace Updater
             xmlDoc.LoadXml(serverXmlString);
             XmlNode xn;
             // Set defaults
-            string serverVersionString="";
-            string serverUpdatePath="";
+            string serverVersionString = "";
+            string serverUpdatePath = "";
             // <updater> is the root element
             xn = xmlDoc.SelectSingleNode("updater/version");
             if (xn != null) serverVersionString = xn.InnerText;
@@ -136,7 +201,7 @@ namespace Updater
             }
             catch (Exception)
             {
-                Log("Error: Current version number is invalid");
+                Error("Error: Current version number is invalid");
                 return;
             }
 
@@ -148,14 +213,14 @@ namespace Updater
             }
             catch (Exception)
             {
-                Log("Error: Remote version number is invalid");
+                Error("Error: Remote version number is invalid");
                 return;
             }
-            
+
             // Check if we have a url
             if (String.IsNullOrEmpty(serverUpdatePath.Trim()))
             {
-                Log("Error: Remote update path is missing");
+                Error("Error: Remote update path is missing");
                 return;
             }
 
@@ -169,7 +234,7 @@ namespace Updater
                 Log("* A newer version is available");
 
                 // Ask to download or not
-                DialogResult dr = MessageBox.Show("An update is available. Do you want to download and install it?",
+                DialogResult dr = MessageBox.Show("A newer version is available. Do you want to download and install it?",
                                   config.caption,
                                   MessageBoxButtons.YesNo,
                                   MessageBoxIcon.Question);
@@ -180,6 +245,9 @@ namespace Updater
                 else
                 {
                     Log("Download canceled");
+
+                    // Not in debug mode? Then terminate on return
+                    if (IsDebug == false) Application.Exit();
                     return;
                 }
 
@@ -195,7 +263,7 @@ namespace Updater
                 catch (Exception ex)
                 {
                     string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Log("Error: Could not download installer file. " + err);
+                    Error("Error: Could not download installer file. " + err);
                     return;
                 }
                 wci.Dispose();
@@ -230,7 +298,7 @@ namespace Updater
                 catch (Exception ex)
                 {
                     string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Log("Error: Could not start the installer. " + err);
+                    Error("Error: Could not start the installer. " + err);
                     return;
                 }
             }
@@ -239,20 +307,34 @@ namespace Updater
                 Log("* No update is available");
 
                 // Show dialog if required
-                DialogResult dr = MessageBox.Show("No update is available",
+                if (IsShowNoupdate)
+                {
+                    DialogResult dr = MessageBox.Show("No update is available",
+                                      config.caption,
+                                      MessageBoxButtons.OK,
+                                      MessageBoxIcon.Information);
+                }
+            }
+        }
+
+        private void ShowMe()
+        {
+            this.WindowState = FormWindowState.Normal;
+            this.ShowInTaskbar = true;
+        }
+
+        private void Error(string text)
+        {
+            // Log it
+            Log(text);
+
+            // Show it if required
+            if (IsShowError)
+            {
+                DialogResult dr = MessageBox.Show(text,
                                   config.caption,
                                   MessageBoxButtons.OK,
-                                  MessageBoxIcon.Information);
-            }
-
-            Log("Finished");
-
-            // Terminate this updater
-            // If we're not in debug mode
-
-            if (IsDebug == false)
-            {
-                Application.Exit();
+                                  MessageBoxIcon.Error);
             }
         }
 

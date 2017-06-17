@@ -50,6 +50,7 @@
             this.Controls.Add(this.textBox1);
             this.Name = "Form1";
             this.Text = "Updater";
+            this.Load += new System.EventHandler(this.Form1_Load);
             this.Shown += new System.EventHandler(this.Form1_Shown);
             this.ResumeLayout(false);
             this.PerformLayout();
