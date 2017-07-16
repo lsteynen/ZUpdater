@@ -7,6 +7,8 @@ using System.IO;
 using System.Xml;
 using System.Diagnostics;
 
+using CmdLine;
+
 namespace Updater
 {
     public partial class Form1 : Form
@@ -40,17 +42,17 @@ namespace Updater
             Log("Updater v" + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision);
 
             // Process the command line
+            // Can throw exception
             try
             {
-                ParseCommandLine();
-                Log("Command line processed: " + GetCommandLineAsString());
+                ProcessCommandLine();
             }
-            catch( Exception ex)
+            catch (Exception ex)
             {
                 // Command line error
                 // Show window, show error, exit
                 ShowMe();
-                Error(ex.Message);
+                Error("Command line error: " + ex.Message);
                 Application.Exit();
                 return;
             }
@@ -89,7 +91,8 @@ namespace Updater
             // Change the caption if specified
             if (String.IsNullOrEmpty(Config.caption) == false)
             {
-                this.Text = Config.caption;
+                Caption = Config.caption;
+                this.Text = Caption;
             }
 
             // Process the config file parameters
@@ -223,7 +226,7 @@ namespace Updater
 
                 // Ask to download or not
                 DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available. Do you want to download and install it?",
-                                  Config.caption,
+                                  Caption,
                                   MessageBoxButtons.YesNo,
                                   MessageBoxIcon.Question);
                 if (dr == DialogResult.Yes)
@@ -295,7 +298,7 @@ namespace Updater
                 if (IsShowNoupdate)
                 {
                     DialogResult dr = MessageBox.Show("No update is available",
-                                      Config.caption,
+                                      Caption,
                                       MessageBoxButtons.OK,
                                       MessageBoxIcon.Information);
                 }
@@ -307,43 +310,32 @@ namespace Updater
         // Example: Updater [-v 1.15.8] [-i] [-n] [-s]
         // Throw exception on error
         /// </summary>
-        private void ParseCommandLine()
+        private void ProcessCommandLine()
         {
-            // get command line parameters
+            CmdLine.CmdLine c = new CmdLine.CmdLine();
+
+            // In winforms we get the executable as the first argument. Handle it as a fixed first argument.
+            CmdLineString ArgExecutable = new CmdLineString("Executable", eUsage.Fixed, "Executable");
+            CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
+            CmdLineSwitch ArgShowInfo = new CmdLineSwitch("i", eUsage.Optional, "Show info");
+            CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' dialog");
+            CmdLineSwitch ArgShowCantReachServer = new CmdLineSwitch("s", eUsage.Optional, "Show 'Cant Reach Server' error");
+
+            c.RegisterParameter(ArgExecutable);
+            c.RegisterParameter(ArgAppCurrentVersion);
+            c.RegisterParameter(ArgShowInfo);
+            c.RegisterParameter(ArgShowNoUpdate);
+            c.RegisterParameter(ArgShowCantReachServer);
+
+            // Parse
             string[] args = Environment.GetCommandLineArgs();
-            // args[0] is the exe file, skip that
-            for (int i = 1; i < args.Length; ++i)
-            {
-                if( args[i] == "-v")
-                {
-                    ++i;
-                    // got value?
-                    if ( (i < args.Length) && (args[i].Substring(0, 1) != "-"))
-                    {
-                        LocalVersionString = args[i];
-                    }
-                    else
-                    {
-                        throw new ArgumentException("Error: Command line parameter -v has no value");
-                    }
-                }
-                else if (args[i] == "-i")
-                {
-                    IsShowInfo = true;
-                }
-                else if (args[i] == "-n")
-                {
-                    IsShowNoupdate = true;
-                }
-                else if (args[i] == "-s")
-                {
-                    IsShowCantReachServer = true;
-                }
-                else
-                {
-                    throw new ArgumentException("Error: Invalid command line parameter: " + args[i]);
-                }
-            }
+            c.Parse(args);
+
+            // Set global parameters to arguments
+            if (ArgAppCurrentVersion.Exists) LocalVersionString = ArgAppCurrentVersion.Value;
+            IsShowInfo = ArgShowInfo.Exists;
+            IsShowNoupdate = ArgShowNoUpdate.Exists;
+            IsShowCantReachServer = ArgShowCantReachServer.Exists;
         }
 
         /// <summary>
