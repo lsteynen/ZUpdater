@@ -15,12 +15,6 @@ namespace Updater
         // public
         // the names of the public variables are also the XML tag names
 
-        public bool debug
-        { get; set; }
-
-        public string version
-        { get; set; }
-
         public string caption
         { get; set; }
 
@@ -30,10 +24,16 @@ namespace Updater
         public string processname
         { get; set; }
 
+        public string version
+        { get; set; }
+
         public string url
         { get; set; }
 
-        public bool showerror
+        public bool showinfo
+        { get; set; }
+
+        public bool showcantreachserver
         { get; set; }
 
         public bool shownoupdate
@@ -44,13 +44,13 @@ namespace Updater
             XmlSerializer xs = new XmlSerializer(typeof(Config));
             StreamReader sr = new StreamReader(file);
             Config tmpconfig = xs.Deserialize(sr) as Config;
-            this.debug = tmpconfig.debug;
-            this.version = tmpconfig.version;
             this.caption = tmpconfig.caption;
             this.name = tmpconfig.name;
             this.processname = tmpconfig.processname;
+            this.version = tmpconfig.version;
             this.url = tmpconfig.url;
-            this.showerror = tmpconfig.showerror;
+            this.showinfo = tmpconfig.showinfo;
+            this.showcantreachserver = tmpconfig.showcantreachserver;
             this.shownoupdate = tmpconfig.shownoupdate;
             sr.Close();
         }

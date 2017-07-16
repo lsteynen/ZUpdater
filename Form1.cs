@@ -6,21 +6,22 @@ using System.Net;
 using System.IO;
 using System.Xml;
 using System.Diagnostics;
-using CmdLine;
 
 namespace Updater
 {
     public partial class Form1 : Form
     {
-        private Config config;
-        private string serverXmlString;
-        private string MyVersion;
-        private bool IsDebug = false;
-        private bool IsShowError = true;
-        private bool IsShowNoupdate = true;
-
-        // TODO: onderscheid maken tussen configuratiefout en communicatiefouten?
-        //       default configuratiefouten wel tonen maar communicatiefouten niet?
+        private string Caption = "Updater";
+        private bool IsShowInfo = false;
+        private bool IsShowCantReachServer = false;
+        private bool IsShowNoupdate = false;
+        private string LocalVersionString;
+        private Version LocalVersion;
+        private Config Config;
+        private string UpdateXmlString;
+        private string UpdateVersionString;
+        private Version UpdateVersion;
+        string UpdateInstallerPath;
 
         public Form1()
         {
@@ -39,41 +40,23 @@ namespace Updater
             Log("Updater v" + v.Major + "." + v.Minor + "." + v.Build + "." + v.Revision);
 
             // Process the command line
-            // Updater [-v 1.15.8] [-d] [-e] [-n]
-            CmdLine.CmdLine c = new CmdLine.CmdLine();
-            // In winforms we get the executable as the first argument. Handle it as a fixed first argument.
-            CmdLineString ArgExecutable = new CmdLineString("Executable", eUsage.Fixed, "Executable");
-            CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
-            CmdLineSwitch ArgDebug = new CmdLineSwitch("d", eUsage.Optional, "Show debug output");
-            CmdLineSwitch ArgShowErrors = new CmdLineSwitch("e", eUsage.Optional, "Show info window on error");
-            CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' dialog");
-
-            c.RegisterParameter(ArgExecutable);
-            c.RegisterParameter(ArgAppCurrentVersion);
-            c.RegisterParameter(ArgDebug);
-            c.RegisterParameter(ArgShowErrors);
-            c.RegisterParameter(ArgShowNoUpdate);
-
-            // get command line parameters
-            string[] args = Environment.GetCommandLineArgs();
             try
             {
-                c.Parse(args);
+                ParseCommandLine();
+                Log("Command line processed: " + GetCommandLineAsString());
             }
-            catch (Exception ex)
+            catch( Exception ex)
             {
-                Error("Command line error. " + ex.Message);
+                // Command line error
+                // Show window, show error, exit
+                ShowMe();
+                Error(ex.Message);
+                Application.Exit();
                 return;
             }
 
-            // Set global parameters to arguments
-            if (ArgAppCurrentVersion.Exists) MyVersion = ArgAppCurrentVersion.Value;
-            IsDebug = ArgDebug.Exists;
-            IsShowError = ArgShowErrors.Exists;
-            IsShowNoupdate = ArgShowNoUpdate.Exists;
-
-            // In debug mode? Then show the main window
-            if (IsDebug)
+            // In info mode? Then show the main window
+            if (IsShowInfo)
             {
                 ShowMe();
             }
@@ -82,55 +65,58 @@ namespace Updater
         // After form is shown
         private void Form1_Shown(object sender, EventArgs e)
         {
-            // Load config file
+            // Load Config file
             // From the same location as this exe
 
             string configfileName = "Updater.xml";
             string configfilePath = Path.Combine(Application.StartupPath, configfileName);
 
-            config = new Config();
+            Config = new Config();
             try
             {
-                config.Load(configfilePath);
-                Log("Config file " + configfileName + " loaded");
-                Log("Config.debug=" + config.debug);
-                Log("Config.version=" + config.version);
-                Log("Config.caption=" + config.caption);
-                Log("Config.name=" + config.name);
-                Log("Config.processname=" + config.processname);
-                Log("Config.url=" + config.url);
-                Log("Config.showerror=" + config.showerror);
-                Log("Config.shownoupdate=" + config.shownoupdate);
+                Config.Load(configfilePath);
+                Log("Config file " + configfilePath + " loaded");
             }
             catch(Exception ex)
             {
                 Error("Error: Could not load config file " + configfileName + ". " + ex.Message);
 
-                // Not in debug mode? Then terminate on return
-                if (IsDebug == false) Application.Exit();
+                // Not in info mode? Then terminate on return
+                if (IsShowInfo == false) Application.Exit();
                 return;
             }
 
-            // Show the updater caption
-            if (String.IsNullOrEmpty(config.caption) == false)
+            // Change the caption if specified
+            if (String.IsNullOrEmpty(Config.caption) == false)
             {
-                this.Text = config.caption;
+                this.Text = Config.caption;
             }
 
-            // TODO: -v versienr van command line nemen, dan die van xml negeren, error als geen
-            // TODO: -d debug vlag van command line OR die van XML
-            // TODO: -e sayerror vlag van command line OR die van XML
-            // TODO: -n saynoupdate vlag van command line OR die van XML
+            // Process the config file parameters
+            IsShowInfo |= Config.showinfo;
+            IsShowCantReachServer |= Config.showcantreachserver;
+            IsShowNoupdate |= Config.shownoupdate;
 
-            // Process the options
-            // if no version given on command line: then take version from xml file
-            if( MyVersion == null) MyVersion = config.version;
-            IsDebug |= config.debug;
-            IsShowError |= config.showerror;
-            IsShowNoupdate |= config.shownoupdate;
+            // Take the current version number from the xml file if not specified on the command line
+            if (LocalVersionString == null) LocalVersionString = Config.version;
+            if (String.IsNullOrEmpty(LocalVersionString)
+                || (LocalVersionString.Trim() == String.Empty))
+            {
+                Error("Error: No current version number specified");
+                return;
+            }
 
-            // In debug mode? Then show the main window
-            if (IsDebug)
+            // Show info in the info window
+            Log("currentversion=" + LocalVersionString);
+            Log("app name=" + Config.name);
+            Log("app processname=" + Config.processname);
+            Log("update url=" + Config.url);
+            Log("show info=" + IsShowInfo);
+            Log("show can't reach server=" + IsShowCantReachServer);
+            Log("show no update=" + IsShowNoupdate);
+
+            // In info mode? Then show the main window
+            if (IsShowInfo)
             {
                 ShowMe();
             }
@@ -140,40 +126,54 @@ namespace Updater
 
             Log("Finished");
 
-            // Not in debug mode? Then terminate on return
-            if (IsDebug == false) Application.Exit();
+            // Not in info mode? Then terminate on return
+            if (IsShowInfo == false)
+            {
+                Application.Exit();
+            }
         }
 
         private void Work()
         {
-            // Check if we have a local version number
-            if (String.IsNullOrEmpty(MyVersion.Trim()))
+            // Convert current version number
+            // major.minor.build.revision scheme, requires 2 or 3 or 4 parts
+            try
             {
-                Error("Error: Version number is missing");
+                LocalVersion = Version.Parse(LocalVersionString);
+            }
+            catch (Exception)
+            {
+                Error("Error: Current version number is invalid: " + LocalVersionString);
                 return;
             }
 
             // Check if we have a url
-            if (String.IsNullOrEmpty(config.url)
-               || (config.url.Trim() == String.Empty))
+            if (String.IsNullOrEmpty(Config.url)
+                || (Config.url.Trim() == String.Empty))
             {
-                Error("Error: Server URL is missing");
+                Error("Error: Update server URL is missing");
                 return;
             }
 
-            // Download the remote XML file into a string
+            // Download the server XML file into a string
 
             WebClient wc = new WebClient();
             try
             {
-                serverXmlString = wc.DownloadString(config.url);
-                Log("Remote xml file downloaded");
-                Log(serverXmlString);
+                UpdateXmlString = wc.DownloadString(Config.url);
+                Log("Server xml info file downloaded");
             }
             catch (Exception ex)
             {
                 string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                Error("Error: Could not download remote xml file. " + err);
+                if (IsShowCantReachServer)
+                {
+                    Error("Error: Could not reach the update server");
+                }
+                else
+                {
+                    Log("Error: Could not reach the update server. " + err);
+                }
                 return;
             }
             wc.Dispose();
@@ -181,61 +181,49 @@ namespace Updater
             // Parse the remote XML file (in a string)
 
             XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.LoadXml(serverXmlString);
+            xmlDoc.LoadXml(UpdateXmlString);
             XmlNode xn;
-            // Set defaults
-            string serverVersionString = "";
-            string serverUpdatePath = "";
             // <updater> is the root element
             xn = xmlDoc.SelectSingleNode("updater/version");
-            if (xn != null) serverVersionString = xn.InnerText;
+            if (xn != null) UpdateVersionString = xn.InnerText;
             xn = xmlDoc.SelectSingleNode("updater/path");
-            if (xn != null) serverUpdatePath = xn.InnerText;
+            if (xn != null) UpdateInstallerPath = xn.InnerText;
 
-            // Get/check current version number
-            // major.minor.build.revision scheme, requires 2 or 3 or 4 parts
-            Version localVersion;
+            // Show settings in the log
+            Log("server version=" + UpdateVersionString);
+            Log("server installer path=" + UpdateInstallerPath);
+
+            // Get/check update version number
             try
             {
-                localVersion = Version.Parse(MyVersion);
+                UpdateVersion = Version.Parse(UpdateVersionString);
             }
             catch (Exception)
             {
-                Error("Error: Current version number is invalid");
-                return;
-            }
-
-            // Get/check remote version number
-            Version serverVersion;
-            try
-            {
-                serverVersion = Version.Parse(serverVersionString);
-            }
-            catch (Exception)
-            {
-                Error("Error: Remote version number is invalid");
+                Error("Error: Server's update version number is invalid");
                 return;
             }
 
             // Check if we have a url
-            if (String.IsNullOrEmpty(serverUpdatePath.Trim()))
+            if (String.IsNullOrEmpty(UpdateInstallerPath)
+                || (UpdateInstallerPath.Trim() == String.Empty))
             {
-                Error("Error: Remote update path is missing");
+                Error("Error: Server's installer path is invalid");
                 return;
             }
 
             // Compare server version to our version
-            // Version.CompareTo returns >0 if serverversion > localversion
-            bool IsNewerAvailable = serverVersion.CompareTo(localVersion) > 0;
+            // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
+            bool IsNewerAvailable = UpdateVersion.CompareTo(LocalVersion) > 0;
 
             // Is a newer version available?
             if (IsNewerAvailable)
             {
-                Log("* A newer version is available");
+                Log("> A newer version is available");
 
                 // Ask to download or not
-                DialogResult dr = MessageBox.Show("A newer version is available. Do you want to download and install it?",
-                                  config.caption,
+                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available. Do you want to download and install it?",
+                                  Config.caption,
                                   MessageBoxButtons.YesNo,
                                   MessageBoxIcon.Question);
                 if (dr == DialogResult.Yes)
@@ -245,19 +233,17 @@ namespace Updater
                 else
                 {
                     Log("Download canceled");
-
-                    // Not in debug mode? Then terminate on return
-                    if (IsDebug == false) Application.Exit();
+                    if (IsShowInfo == false) Application.Exit();
                     return;
                 }
 
                 // Download the new installer file
                 // to the temporary directory
                 WebClient wci = new WebClient();
-                string localInstallerPath = System.IO.Path.GetTempPath() + Path.GetFileName(serverUpdatePath);
+                string localInstallerPath = System.IO.Path.GetTempPath() + Path.GetFileName(UpdateInstallerPath);
                 try
                 {
-                    wci.DownloadFile(serverUpdatePath, localInstallerPath);
+                    wci.DownloadFile(UpdateInstallerPath, localInstallerPath);
                     Log("Installer file downloaded");
                 }
                 catch (Exception ex)
@@ -272,12 +258,12 @@ namespace Updater
 
                 try
                 {
-                    Process[] procs = Process.GetProcessesByName(config.processname);
+                    Process[] procs = Process.GetProcessesByName(Config.processname);
                     if (procs.Length >= 1)
                     {
-                        Log("Killing running instances");
                         foreach (Process proc in procs)
                         {
+                            Log("Killing running instance");
                             proc.Kill();
                         }
                     }
@@ -285,7 +271,6 @@ namespace Updater
                 catch (Exception ex)
                 {
                     Log(ex.Message);
-                    MessageBox.Show(ex.Message);
                 }
 
                 // Run the installer
@@ -304,23 +289,81 @@ namespace Updater
             }
             else
             {
-                Log("* No update is available");
+                Log("> No update is available");
 
                 // Show dialog if required
                 if (IsShowNoupdate)
                 {
                     DialogResult dr = MessageBox.Show("No update is available",
-                                      config.caption,
+                                      Config.caption,
                                       MessageBoxButtons.OK,
                                       MessageBoxIcon.Information);
                 }
             }
         }
 
+        /// <summary>
+        /// // Process the command line
+        // Example: Updater [-v 1.15.8] [-i] [-n] [-s]
+        // Throw exception on error
+        /// </summary>
+        private void ParseCommandLine()
+        {
+            // get command line parameters
+            string[] args = Environment.GetCommandLineArgs();
+            // args[0] is the exe file, skip that
+            for (int i = 1; i < args.Length; ++i)
+            {
+                if( args[i] == "-v")
+                {
+                    ++i;
+                    // got value?
+                    if ( (i < args.Length) && (args[i].Substring(0, 1) != "-"))
+                    {
+                        LocalVersionString = args[i];
+                    }
+                    else
+                    {
+                        throw new ArgumentException("Error: Command line parameter -v has no value");
+                    }
+                }
+                else if (args[i] == "-i")
+                {
+                    IsShowInfo = true;
+                }
+                else if (args[i] == "-n")
+                {
+                    IsShowNoupdate = true;
+                }
+                else if (args[i] == "-s")
+                {
+                    IsShowCantReachServer = true;
+                }
+                else
+                {
+                    throw new ArgumentException("Error: Invalid command line parameter: " + args[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Make the main window visible
+        /// </summary>
         private void ShowMe()
         {
             this.WindowState = FormWindowState.Normal;
             this.ShowInTaskbar = true;
+        }
+
+        private string GetCommandLineAsString()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            string result = String.Empty;
+            for (int i = 1; i < args.Length; ++i)
+            {
+                result += " " + args[i];
+            }
+            return result;
         }
 
         private void Error(string text)
@@ -328,14 +371,11 @@ namespace Updater
             // Log it
             Log(text);
 
-            // Show it if required
-            if (IsShowError)
-            {
-                DialogResult dr = MessageBox.Show(text,
-                                  config.caption,
-                                  MessageBoxButtons.OK,
-                                  MessageBoxIcon.Error);
-            }
+            // Show it
+            DialogResult dr = MessageBox.Show(text,
+                                Caption,
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
         }
 
         private void Log(string message)
