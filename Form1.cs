@@ -110,13 +110,13 @@ namespace Updater
             }
 
             // Show info in the info window
-            Log("currentversion=" + LocalVersionString);
-            Log("app name=" + Config.name);
-            Log("app processname=" + Config.processname);
-            Log("update url=" + Config.url);
-            Log("show info=" + IsShowInfo);
-            Log("show can't reach server=" + IsShowCantReachServer);
-            Log("show no update=" + IsShowNoupdate);
+            Log(" currentversion=" + LocalVersionString);
+            Log(" app name=" + Config.name);
+            Log(" app processname=" + Config.processname);
+            Log(" update url=" + Config.url);
+            Log(" show info=" + IsShowInfo);
+            Log(" show can't reach server=" + IsShowCantReachServer);
+            Log(" show no update=" + IsShowNoupdate);
 
             // In info mode? Then show the main window
             if (IsShowInfo)
@@ -193,8 +193,8 @@ namespace Updater
             if (xn != null) UpdateInstallerPath = xn.InnerText;
 
             // Show settings in the log
-            Log("server version=" + UpdateVersionString);
-            Log("server installer path=" + UpdateInstallerPath);
+            Log(" server version=" + UpdateVersionString);
+            Log(" server installer path=" + UpdateInstallerPath);
 
             // Get/check update version number
             try
