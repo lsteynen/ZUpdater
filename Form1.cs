@@ -23,7 +23,7 @@ namespace Updater
         private string UpdateXmlString;
         private string UpdateVersionString;
         private Version UpdateVersion;
-        string UpdateInstallerPath;
+        private string UpdatePath;
 
         public Form1()
         {
@@ -111,12 +111,12 @@ namespace Updater
 
             // Show info in the info window
             Log(" currentversion=" + LocalVersionString);
-            Log(" app name=" + Config.name);
-            Log(" app processname=" + Config.processname);
-            Log(" update url=" + Config.url);
-            Log(" show info=" + IsShowInfo);
-            Log(" show can't reach server=" + IsShowCantReachServer);
-            Log(" show no update=" + IsShowNoupdate);
+            Log(" app_name=" + Config.name);
+            Log(" app_processname=" + Config.processname);
+            Log(" update_url=" + Config.url);
+            Log(" show_info=" + IsShowInfo);
+            Log(" show_can't_reach_server=" + IsShowCantReachServer);
+            Log(" show_no_update=" + IsShowNoupdate);
 
             // In info mode? Then show the main window
             if (IsShowInfo)
@@ -158,13 +158,13 @@ namespace Updater
                 return;
             }
 
-            // Download the server XML file into a string
+            // Download the update server XML file into a string
 
             WebClient wc = new WebClient();
             try
             {
                 UpdateXmlString = wc.DownloadString(Config.url);
-                Log("Server xml info file downloaded");
+                Log("Update server xml info file downloaded");
             }
             catch (Exception ex)
             {
@@ -182,40 +182,21 @@ namespace Updater
             wc.Dispose();
 
             // Parse the remote XML file (in a string)
-
-            XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.LoadXml(UpdateXmlString);
-            XmlNode xn;
-            // <updater> is the root element
-            xn = xmlDoc.SelectSingleNode("updater/version");
-            if (xn != null) UpdateVersionString = xn.InnerText;
-            xn = xmlDoc.SelectSingleNode("updater/path");
-            if (xn != null) UpdateInstallerPath = xn.InnerText;
-
-            // Show settings in the log
-            Log(" server version=" + UpdateVersionString);
-            Log(" server installer path=" + UpdateInstallerPath);
-
-            // Get/check update version number
             try
             {
-                UpdateVersion = Version.Parse(UpdateVersionString);
+                ProcessUpdateInfoXml(UpdateXmlString);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                Error("Error: Server's update version number is invalid");
+                Error("Error: In parsing update server XML file: " + ex.Message);
                 return;
             }
 
-            // Check if we have a url
-            if (String.IsNullOrEmpty(UpdateInstallerPath)
-                || (UpdateInstallerPath.Trim() == String.Empty))
-            {
-                Error("Error: Server's installer path is invalid");
-                return;
-            }
+            // Show info in the log
+            Log(" update_version=" + UpdateVersionString);
+            Log(" update_path=" + UpdatePath);
 
-            // Compare server version to our version
+            // Compare update server version to our version
             // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
             bool IsNewerAvailable = UpdateVersion.CompareTo(LocalVersion) > 0;
 
@@ -240,13 +221,15 @@ namespace Updater
                     return;
                 }
 
+                // TODO: kan de info.xml zonder path zijn? of met ".\"?
+
                 // Download the new installer file
                 // to the temporary directory
                 WebClient wci = new WebClient();
-                string localInstallerPath = System.IO.Path.GetTempPath() + Path.GetFileName(UpdateInstallerPath);
+                string localInstallerPath = System.IO.Path.GetTempPath() + Path.GetFileName(UpdatePath);
                 try
                 {
-                    wci.DownloadFile(UpdateInstallerPath, localInstallerPath);
+                    wci.DownloadFile(UpdatePath, localInstallerPath);
                     Log("Installer file downloaded");
                 }
                 catch (Exception ex)
@@ -319,7 +302,7 @@ namespace Updater
             CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
             CmdLineSwitch ArgShowInfo = new CmdLineSwitch("i", eUsage.Optional, "Show info");
             CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' dialog");
-            CmdLineSwitch ArgShowCantReachServer = new CmdLineSwitch("s", eUsage.Optional, "Show 'Cant Reach Server' error");
+            CmdLineSwitch ArgShowCantReachServer = new CmdLineSwitch("s", eUsage.Optional, "Show 'Cant reach update server' error");
 
             c.RegisterParameter(ArgExecutable);
             c.RegisterParameter(ArgAppCurrentVersion);
@@ -339,23 +322,60 @@ namespace Updater
         }
 
         /// <summary>
+        /// Parse the updater server's Info.xml file
+        /// Throws exception on error
+        /// Result in class variables UpdateVersionString, UpdateVersion, UpdatePath
+        /// </summary>
+        public void ProcessUpdateInfoXml(string XmlString)
+        {
+            XmlDocument xmlDoc = new XmlDocument();
+            xmlDoc.LoadXml(XmlString);
+
+            // The root element
+            XmlNode xroot = xmlDoc.SelectSingleNode("updater");
+            if (xroot == null)
+            {
+                throw new Exception("XML root element <updater> not found.");
+            }
+
+            // Update version, required
+            XmlNode xn1 = xroot.SelectSingleNode("version");
+            if (xn1 == null)
+            {
+                throw new Exception("XML element <version> not found.");
+            }
+            UpdateVersionString = xn1.InnerText;
+            // Get/check update version number
+            try
+            {
+                UpdateVersion = Version.Parse(UpdateVersionString);
+            }
+            catch (Exception)
+            {
+                throw new Exception("XML element <version> is invalid.");
+            }
+
+            // Update path, required
+            xn1 = xroot.SelectSingleNode("path");
+            if (xn1 == null)
+            {
+                throw new Exception("XML element <path> not found.");
+            }
+            UpdatePath = xn1.InnerText;
+            // Check if we have a URL
+            if (String.IsNullOrEmpty(UpdatePath) || (UpdatePath.Trim() == String.Empty))
+            {
+                throw new Exception("XML element <path> is empty.");
+            }
+        }
+
+        /// <summary>
         /// Make the main window visible
         /// </summary>
         private void ShowMe()
         {
             this.WindowState = FormWindowState.Normal;
             this.ShowInTaskbar = true;
-        }
-
-        private string GetCommandLineAsString()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            string result = String.Empty;
-            for (int i = 1; i < args.Length; ++i)
-            {
-                result += " " + args[i];
-            }
-            return result;
         }
 
         private void Error(string text)
