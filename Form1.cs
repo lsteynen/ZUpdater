@@ -12,17 +12,6 @@ using CmdLine;
 // TODO: Error meldingen wijzigen:
 //  ShowErrors optioneel -e). If not: then users won't be warned when there's no connection of internet or the infourl is not available. 
 
-// TODO: moet <path> in Updaterinfo.xml relatief zijn? 
-//  JA, de updater server weet niet altijd of Updater via file://, \\server\..., http://... of ftp://... bij de info.xml geraakt is.
-
-// TODO: ook path naar installer file in info tonen
-
-// TODO: met http:// mogen er geen backslashen in staan
-
-// Test met file://
-// Test met http://
-// Test met ftp://
-
 namespace Updater
 {
     public partial class Form1 : Form
@@ -38,7 +27,7 @@ namespace Updater
         private string UpdateVersionString;
         private Version UpdateVersion;
         private string UpdateFile;
-        private string UpdateCombinedPath;
+        private Uri UriToInstallerFile;
 
         public Form1()
         {
@@ -124,14 +113,14 @@ namespace Updater
                 return;
             }
 
-            Log(" caption=" + Config.caption);
-            Log(" name=" + Config.name);
-            Log(" processname=" + Config.processname);
-            Log(" version=" + LocalVersionString);
-            Log(" infourl=" + Config.infourl);
-            Log(" showinfo=" + IsShowInfo);
-            Log(" showerrors=" + IsShowErrors);
-            Log(" shownoupdate=" + IsShowNoUpdate);
+            Log("caption=" + Config.caption);
+            Log("name=" + Config.name);
+            Log("processname=" + Config.processname);
+            Log("version=" + LocalVersionString);
+            Log("infourl=" + Config.infourl);
+            Log("showinfo=" + IsShowInfo);
+            Log("showerrors=" + IsShowErrors);
+            Log("shownoupdate=" + IsShowNoUpdate);
 
             // In info mode? Then show the main window
             if (IsShowInfo)
@@ -208,13 +197,16 @@ namespace Updater
             }
 
             // Show info in the log
-            Log(" update_version=" + UpdateVersionString);
-            Log(" update_file=" + UpdateFile);
+            Log("update_version=" + UpdateVersionString);
+            Log("update_file=" + UpdateFile);
 
-            // Determine the path to the installer file, combined from the path to the UpdaterInfo.xml and 
-            // the filename or path specified in updater server's Info.xml
-            UpdateCombinedPath = MakeDownloadPath(Config.infourl, UpdateFile);
-            Log(" update combined path=" + UpdateCombinedPath);
+            // Determine the URI path to the installer file, 
+            // combined from the path to UpdaterInfo.xml and 
+            // the filename or (relative) path specified in updater server's Info.xml
+            // Using the URI class takes care of slashes and backslashes in the path.
+            Uri TmpUri = new Uri(Config.infourl);
+            UriToInstallerFile = new Uri(TmpUri, UpdateFile);
+            Log("update_uri=" + UriToInstallerFile.ToString());
 
             // Compare update server version to our version
             // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
@@ -226,8 +218,7 @@ namespace Updater
                 Log("> A newer version is available");
 
                 // Ask to download or not
-                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available." + Environment.NewLine + 
-                                                  "Version " + UpdateVersionString + Environment.NewLine + 
+                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " (v" + UpdateVersionString + ") is available." + Environment.NewLine + 
                                                   "Do you want to download and install it?",
                                   Caption,
                                   MessageBoxButtons.YesNo,
@@ -249,13 +240,13 @@ namespace Updater
                 string localInstallerPath = Path.Combine(System.IO.Path.GetTempPath(), Path.GetFileName(UpdateFile));
                 try
                 {
-                    wci.DownloadFile(UpdateCombinedPath, localInstallerPath);
+                    wci.DownloadFile(UriToInstallerFile, localInstallerPath);
                     Log("Installer file downloaded");
                 }
                 catch (Exception ex)
                 {
                     string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Error("Error: Could not download installer file. " + err);
+                    Error("Error: Could not download installer file: " + err);
                     return;
                 }
                 wci.Dispose();
@@ -289,7 +280,7 @@ namespace Updater
                 catch (Exception ex)
                 {
                     string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Error("Error: Could not start the installer. " + err);
+                    Error("Error: Could not start the installer: " + err);
                     return;
                 }
             }
@@ -387,42 +378,6 @@ namespace Updater
             {
                 throw new Exception("XML element <file> is empty.");
             }
-        }
-
-        public static string MakeDownloadPath(string pathToServer, string pathOnServer)
-        {
-            if (System.IO.Path.IsPathRooted(pathOnServer) || IsPathUni(pathOnServer))
-            {
-                return pathOnServer;
-            }
-            else
-            {
-                return Path.Combine(MyPathGetDirectoryName(pathToServer), pathOnServer);
-            }
-        }
-
-        public static bool IsPathUni(string path)
-        {
-            return path.Contains("://");
-        }
-
-        public static string MyPathGetDirectoryName(string path)
-        {
-            int rootLength = Path.GetPathRoot(path).Length;
-            int num2 = path.Length;
-            if (num2 > rootLength)
-            {
-                num2 = path.Length;
-                if (num2 == rootLength)
-                {
-                    return null;
-                }
-                while (num2 > rootLength && path[--num2] != Path.DirectorySeparatorChar && path[num2] != Path.AltDirectorySeparatorChar)
-                {
-                }
-                return path.Substring(0, num2);
-            }
-            return null;
         }
 
         /// <summary>
