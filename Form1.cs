@@ -173,13 +173,10 @@ namespace Updater
             catch (Exception ex)
             {
                 string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
+                Log("Error: Could not reach the update server. " + err);
                 if (IsShowErrors)
                 {
-                    Error("Error: Could not reach the update server");
-                }
-                else
-                {
-                    Log("Error: Could not reach the update server. " + err);
+                    ErrorWithoutLog("Error: Could not reach the update server");
                 }
                 return;
             }
@@ -394,6 +391,15 @@ namespace Updater
             // Log it
             Log(text);
 
+            // Show it
+            DialogResult dr = MessageBox.Show(text,
+                                Caption,
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+        }
+
+        private void ErrorWithoutLog(string text)
+        {
             // Show it
             DialogResult dr = MessageBox.Show(text,
                                 Caption,
