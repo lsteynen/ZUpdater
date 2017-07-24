@@ -27,13 +27,13 @@ namespace Updater
         public string version
         { get; set; }
 
-        public string url
+        public string infourl
         { get; set; }
 
         public bool showinfo
         { get; set; }
 
-        public bool showcantreachserver
+        public bool showerrors
         { get; set; }
 
         public bool shownoupdate
@@ -48,9 +48,9 @@ namespace Updater
             this.name = tmpconfig.name;
             this.processname = tmpconfig.processname;
             this.version = tmpconfig.version;
-            this.url = tmpconfig.url;
+            this.infourl = tmpconfig.infourl;
             this.showinfo = tmpconfig.showinfo;
-            this.showcantreachserver = tmpconfig.showcantreachserver;
+            this.showerrors = tmpconfig.showerrors;
             this.shownoupdate = tmpconfig.shownoupdate;
             sr.Close();
         }

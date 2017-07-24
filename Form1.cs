@@ -9,21 +9,36 @@ using System.Diagnostics;
 
 using CmdLine;
 
+// TODO: Error meldingen wijzigen:
+//  ShowErrors optioneel -e). If not: then users won't be warned when there's no connection of internet or the infourl is not available. 
+
+// TODO: moet <path> in Updaterinfo.xml relatief zijn? 
+//  JA, de updater server weet niet altijd of Updater via file://, \\server\..., http://... of ftp://... bij de info.xml geraakt is.
+
+// TODO: ook path naar installer file in info tonen
+
+// TODO: met http:// mogen er geen backslashen in staan
+
+// Test met file://
+// Test met http://
+// Test met ftp://
+
 namespace Updater
 {
     public partial class Form1 : Form
     {
         private string Caption = "Updater";
         private bool IsShowInfo = false;
-        private bool IsShowCantReachServer = false;
-        private bool IsShowNoupdate = false;
+        private bool IsShowErrors = false;
+        private bool IsShowNoUpdate = false;
         private string LocalVersionString;
         private Version LocalVersion;
         private Config Config;
         private string UpdateXmlString;
         private string UpdateVersionString;
         private Version UpdateVersion;
-        private string UpdatePath;
+        private string UpdateFile;
+        private string UpdateCombinedPath;
 
         public Form1()
         {
@@ -97,8 +112,8 @@ namespace Updater
 
             // Process the config file parameters
             IsShowInfo |= Config.showinfo;
-            IsShowCantReachServer |= Config.showcantreachserver;
-            IsShowNoupdate |= Config.shownoupdate;
+            IsShowErrors |= Config.showerrors;
+            IsShowNoUpdate |= Config.shownoupdate;
 
             // Take the current version number from the xml file if not specified on the command line
             if (LocalVersionString == null) LocalVersionString = Config.version;
@@ -109,14 +124,14 @@ namespace Updater
                 return;
             }
 
-            // Show info in the info window
-            Log(" currentversion=" + LocalVersionString);
-            Log(" app_name=" + Config.name);
-            Log(" app_processname=" + Config.processname);
-            Log(" update_url=" + Config.url);
-            Log(" show_info=" + IsShowInfo);
-            Log(" show_can't_reach_server=" + IsShowCantReachServer);
-            Log(" show_no_update=" + IsShowNoupdate);
+            Log(" caption=" + Config.caption);
+            Log(" name=" + Config.name);
+            Log(" processname=" + Config.processname);
+            Log(" version=" + LocalVersionString);
+            Log(" infourl=" + Config.infourl);
+            Log(" showinfo=" + IsShowInfo);
+            Log(" showerrors=" + IsShowErrors);
+            Log(" shownoupdate=" + IsShowNoUpdate);
 
             // In info mode? Then show the main window
             if (IsShowInfo)
@@ -150,9 +165,9 @@ namespace Updater
                 return;
             }
 
-            // Check if we have a url
-            if (String.IsNullOrEmpty(Config.url)
-                || (Config.url.Trim() == String.Empty))
+            // Check if we have a infourl
+            if (String.IsNullOrEmpty(Config.infourl)
+                || (Config.infourl.Trim() == String.Empty))
             {
                 Error("Error: Update server URL is missing");
                 return;
@@ -163,13 +178,13 @@ namespace Updater
             WebClient wc = new WebClient();
             try
             {
-                UpdateXmlString = wc.DownloadString(Config.url);
+                UpdateXmlString = wc.DownloadString(Config.infourl);
                 Log("Update server xml info file downloaded");
             }
             catch (Exception ex)
             {
                 string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                if (IsShowCantReachServer)
+                if (IsShowErrors)
                 {
                     Error("Error: Could not reach the update server");
                 }
@@ -194,7 +209,12 @@ namespace Updater
 
             // Show info in the log
             Log(" update_version=" + UpdateVersionString);
-            Log(" update_path=" + UpdatePath);
+            Log(" update_file=" + UpdateFile);
+
+            // Determine the path to the installer file, combined from the path to the UpdaterInfo.xml and 
+            // the filename or path specified in updater server's Info.xml
+            UpdateCombinedPath = MakeDownloadPath(Config.infourl, UpdateFile);
+            Log(" update combined path=" + UpdateCombinedPath);
 
             // Compare update server version to our version
             // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
@@ -206,7 +226,9 @@ namespace Updater
                 Log("> A newer version is available");
 
                 // Ask to download or not
-                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available. Do you want to download and install it?",
+                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available." + Environment.NewLine + 
+                                                  "Version " + UpdateVersionString + Environment.NewLine + 
+                                                  "Do you want to download and install it?",
                                   Caption,
                                   MessageBoxButtons.YesNo,
                                   MessageBoxIcon.Question);
@@ -221,15 +243,13 @@ namespace Updater
                     return;
                 }
 
-                // TODO: kan de info.xml zonder path zijn? of met ".\"?
-
                 // Download the new installer file
                 // to the temporary directory
                 WebClient wci = new WebClient();
-                string localInstallerPath = System.IO.Path.GetTempPath() + Path.GetFileName(UpdatePath);
+                string localInstallerPath = Path.Combine(System.IO.Path.GetTempPath(), Path.GetFileName(UpdateFile));
                 try
                 {
-                    wci.DownloadFile(UpdatePath, localInstallerPath);
+                    wci.DownloadFile(UpdateCombinedPath, localInstallerPath);
                     Log("Installer file downloaded");
                 }
                 catch (Exception ex)
@@ -278,7 +298,7 @@ namespace Updater
                 Log("> No update is available");
 
                 // Show dialog if required
-                if (IsShowNoupdate)
+                if (IsShowNoUpdate)
                 {
                     DialogResult dr = MessageBox.Show("No update is available",
                                       Caption,
@@ -290,7 +310,7 @@ namespace Updater
 
         /// <summary>
         /// // Process the command line
-        // Example: Updater [-v 1.15.8] [-i] [-n] [-s]
+        // Example: Updater [-v 1.15.8] [-i] [-n] [-e]
         // Throw exception on error
         /// </summary>
         private void ProcessCommandLine()
@@ -301,14 +321,14 @@ namespace Updater
             CmdLineString ArgExecutable = new CmdLineString("Executable", eUsage.Fixed, "Executable");
             CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
             CmdLineSwitch ArgShowInfo = new CmdLineSwitch("i", eUsage.Optional, "Show info");
-            CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' dialog");
-            CmdLineSwitch ArgShowCantReachServer = new CmdLineSwitch("s", eUsage.Optional, "Show 'Cant reach update server' error");
+            CmdLineSwitch ArgShowNoUpdate = new CmdLineSwitch("n", eUsage.Optional, "Show 'No update available' message");
+            CmdLineSwitch ArgShowErrors = new CmdLineSwitch("e", eUsage.Optional, "Show error messages like configuration error or update server can't be reached");
 
             c.RegisterParameter(ArgExecutable);
             c.RegisterParameter(ArgAppCurrentVersion);
             c.RegisterParameter(ArgShowInfo);
             c.RegisterParameter(ArgShowNoUpdate);
-            c.RegisterParameter(ArgShowCantReachServer);
+            c.RegisterParameter(ArgShowErrors);
 
             // Parse
             string[] args = Environment.GetCommandLineArgs();
@@ -317,14 +337,14 @@ namespace Updater
             // Set global parameters to arguments
             if (ArgAppCurrentVersion.Exists) LocalVersionString = ArgAppCurrentVersion.Value;
             IsShowInfo = ArgShowInfo.Exists;
-            IsShowNoupdate = ArgShowNoUpdate.Exists;
-            IsShowCantReachServer = ArgShowCantReachServer.Exists;
+            IsShowNoUpdate = ArgShowNoUpdate.Exists;
+            IsShowErrors = ArgShowErrors.Exists;
         }
 
         /// <summary>
         /// Parse the updater server's Info.xml file
         /// Throws exception on error
-        /// Result in class variables UpdateVersionString, UpdateVersion, UpdatePath
+        /// Result in class variables UpdateVersionString, UpdateVersion, UpdateFile
         /// </summary>
         public void ProcessUpdateInfoXml(string XmlString)
         {
@@ -355,18 +375,54 @@ namespace Updater
                 throw new Exception("XML element <version> is invalid.");
             }
 
-            // Update path, required
-            xn1 = xroot.SelectSingleNode("path");
+            // Update file, required
+            xn1 = xroot.SelectSingleNode("file");
             if (xn1 == null)
             {
-                throw new Exception("XML element <path> not found.");
+                throw new Exception("XML element <file> not found.");
             }
-            UpdatePath = xn1.InnerText;
+            UpdateFile = xn1.InnerText;
             // Check if we have a URL
-            if (String.IsNullOrEmpty(UpdatePath) || (UpdatePath.Trim() == String.Empty))
+            if (String.IsNullOrEmpty(UpdateFile) || (UpdateFile.Trim() == String.Empty))
             {
-                throw new Exception("XML element <path> is empty.");
+                throw new Exception("XML element <file> is empty.");
             }
+        }
+
+        public static string MakeDownloadPath(string pathToServer, string pathOnServer)
+        {
+            if (System.IO.Path.IsPathRooted(pathOnServer) || IsPathUni(pathOnServer))
+            {
+                return pathOnServer;
+            }
+            else
+            {
+                return Path.Combine(MyPathGetDirectoryName(pathToServer), pathOnServer);
+            }
+        }
+
+        public static bool IsPathUni(string path)
+        {
+            return path.Contains("://");
+        }
+
+        public static string MyPathGetDirectoryName(string path)
+        {
+            int rootLength = Path.GetPathRoot(path).Length;
+            int num2 = path.Length;
+            if (num2 > rootLength)
+            {
+                num2 = path.Length;
+                if (num2 == rootLength)
+                {
+                    return null;
+                }
+                while (num2 > rootLength && path[--num2] != Path.DirectorySeparatorChar && path[num2] != Path.AltDirectorySeparatorChar)
+                {
+                }
+                return path.Substring(0, num2);
+            }
+            return null;
         }
 
         /// <summary>
