@@ -9,9 +9,6 @@ using System.Diagnostics;
 
 using CmdLine;
 
-// TODO: Error meldingen wijzigen:
-//  ShowErrors optioneel -e). If not: then users won't be warned when there's no connection of internet or the infourl is not available. 
-
 namespace Updater
 {
     public partial class Form1 : Form
@@ -56,7 +53,7 @@ namespace Updater
                 // Command line error
                 // Show window, show error, exit
                 ShowMe();
-                Error("Command line error: " + ex.Message);
+                Error1("Command line error: " + ex.Message);
                 Application.Exit();
                 return;
             }
@@ -81,11 +78,11 @@ namespace Updater
             try
             {
                 Config.Load(configfilePath);
-                Log("Config file " + configfilePath + " loaded");
+                Log("Config file '" + configfilePath + "' loaded");
             }
             catch(Exception ex)
             {
-                Error("Error: Could not load config file " + configfileName + ". " + ex.Message);
+                Error2("Error: Could not load config file '" + configfileName + "'. " + ex.Message);
 
                 // Not in info mode? Then terminate on return
                 if (IsShowInfo == false) Application.Exit();
@@ -99,7 +96,7 @@ namespace Updater
                 this.Text = Caption;
             }
 
-            // Process the config file parameters
+            // Process the config file switches
             IsShowInfo |= Config.showinfo;
             IsShowErrors |= Config.showerrors;
             IsShowNoUpdate |= Config.shownoupdate;
@@ -109,15 +106,15 @@ namespace Updater
             if (String.IsNullOrEmpty(LocalVersionString)
                 || (LocalVersionString.Trim() == String.Empty))
             {
-                Error("Error: No current version number specified");
+                Error2("Error: No current version number specified");
                 return;
             }
 
-            Log("caption=" + Config.caption);
-            Log("name=" + Config.name);
-            Log("processname=" + Config.processname);
+            Log("caption='" + Config.caption+"'");
+            Log("name='" + Config.name + "'");
+            Log("processname='" + Config.processname + "'");
             Log("version=" + LocalVersionString);
-            Log("infourl=" + Config.infourl);
+            Log("infourl='" + Config.infourl + "'");
             Log("showinfo=" + IsShowInfo);
             Log("showerrors=" + IsShowErrors);
             Log("shownoupdate=" + IsShowNoUpdate);
@@ -150,7 +147,7 @@ namespace Updater
             }
             catch (Exception)
             {
-                Error("Error: Current version number is invalid: " + LocalVersionString);
+                Error2("Error: Current version number is invalid: " + LocalVersionString);
                 return;
             }
 
@@ -158,7 +155,7 @@ namespace Updater
             if (String.IsNullOrEmpty(Config.infourl)
                 || (Config.infourl.Trim() == String.Empty))
             {
-                Error("Error: Update server URL is missing");
+                Error2("Error: Update server URL is missing");
                 return;
             }
 
@@ -172,12 +169,10 @@ namespace Updater
             }
             catch (Exception ex)
             {
-                string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                Log("Error: Could not reach the update server. " + err);
-                if (IsShowErrors)
-                {
-                    ErrorWithoutLog("Error: Could not reach the update server");
-                }
+                string excepmsg = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
+                // Logtext with exception message, error dialog without
+                Error2("Error: Could not reach the update server. " + excepmsg,
+                       "Error: Could not reach the update server");
                 return;
             }
             wc.Dispose();
@@ -189,13 +184,13 @@ namespace Updater
             }
             catch (Exception ex)
             {
-                Error("Error: In parsing update server XML file: " + ex.Message);
+                Error2("Error: In parsing update server XML file: " + ex.Message);
                 return;
             }
 
             // Show info in the log
             Log("update_version=" + UpdateVersionString);
-            Log("update_file=" + UpdateFile);
+            Log("update_file='" + UpdateFile+"'");
 
             // Determine the URI path to the installer file, 
             // combined from the path to UpdaterInfo.xml and 
@@ -203,7 +198,7 @@ namespace Updater
             // Using the URI class takes care of slashes and backslashes in the path.
             Uri TmpUri = new Uri(Config.infourl);
             UriToInstallerFile = new Uri(TmpUri, UpdateFile);
-            Log("update_uri=" + UriToInstallerFile.ToString());
+            Log("update_uri='" + UriToInstallerFile.ToString()+"'");
 
             // Compare update server version to our version
             // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
@@ -222,7 +217,9 @@ namespace Updater
                                   MessageBoxIcon.Question);
                 if (dr == DialogResult.Yes)
                 {
-                    // continue
+                    // The user wants to download the new installer
+                    // From now on show error dialog if something goes wrong
+                    IsShowErrors = true;
                 }
                 else
                 {
@@ -242,8 +239,8 @@ namespace Updater
                 }
                 catch (Exception ex)
                 {
-                    string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Error("Error: Could not download installer file: " + err);
+                    string excepmsg = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
+                    Error2("Error: Could not download installer file: " + excepmsg);
                     return;
                 }
                 wci.Dispose();
@@ -276,8 +273,8 @@ namespace Updater
                 }
                 catch (Exception ex)
                 {
-                    string err = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
-                    Error("Error: Could not start the installer: " + err);
+                    string excepmsg = (ex.InnerException != null) ? ex.InnerException.Message : ex.Message;
+                    Error2("Error: Could not start the installer: " + excepmsg);
                     return;
                 }
             }
@@ -386,25 +383,51 @@ namespace Updater
             this.ShowInTaskbar = true;
         }
 
-        private void Error(string text)
+        /// <summary>
+        /// Log the text in the info log
+        /// Show error dialog with same text, independent of IsShowErrors
+        /// </summary>
+        private void Error1(string text)
         {
-            // Log it
-            Log(text);
-
-            // Show it
-            DialogResult dr = MessageBox.Show(text,
-                                Caption,
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
+            Error1(text, text);
         }
 
-        private void ErrorWithoutLog(string text)
+        /// <summary>
+        /// Log the logtext in the info log
+        /// Show error dialog with errortext, independent of IsShowErrors
+        /// </summary>
+        private void Error1(string logtext, string errortext)
         {
+            // Log it
+            Log(logtext);
+
             // Show it
-            DialogResult dr = MessageBox.Show(text,
-                                Caption,
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
+            DialogResult dr = MessageBox.Show(errortext, Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        /// <summary>
+        /// Log the text in the info log
+        /// If IsShowErrors: show error dialog with same text
+        /// </summary>
+        private void Error2(string text)
+        {
+            Error2(text, text);
+        }
+
+        /// <summary>
+        /// Log the logtext in the info log
+        /// If IsShowErrors: Show error dialog with errortext, independent of IsShowErrors
+        /// </summary>
+        private void Error2(string logtext, string errortext)
+        {
+            // Log it
+            Log(logtext);
+
+            // Show it?
+            if (IsShowErrors)
+            {
+                DialogResult dr = MessageBox.Show(errortext, Caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void Log(string message)
