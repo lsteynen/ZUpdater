@@ -51,8 +51,7 @@ namespace Updater
             catch (Exception ex)
             {
                 // Command line error
-                // Show window, show error, exit
-                ShowMe();
+                // Show error, exit
                 Error1("Command line error: " + ex.Message);
                 Application.Exit();
                 return;
@@ -83,9 +82,8 @@ namespace Updater
             catch(Exception ex)
             {
                 Error2("Error: Could not load config file '" + configfileName + "'. " + ex.Message);
-
                 // Not in info mode? Then terminate on return
-                if (IsShowInfo == false) Application.Exit();
+                if (IsVisible() == false) Application.Exit();
                 return;
             }
 
@@ -101,12 +99,20 @@ namespace Updater
             IsShowErrors |= Config.showerrors;
             IsShowNoUpdate |= Config.shownoupdate;
 
+            // In info mode? Then show the main window
+            if (IsShowInfo)
+            {
+                ShowMe();
+            }
+
             // Take the current version number from the xml file if not specified on the command line
             if (LocalVersionString == null) LocalVersionString = Config.version;
             if (String.IsNullOrEmpty(LocalVersionString)
                 || (LocalVersionString.Trim() == String.Empty))
             {
                 Error2("Error: No current version number specified");
+                // Not visible? Then terminate on return
+                if (IsVisible() == false) Application.Exit();
                 return;
             }
 
@@ -119,19 +125,13 @@ namespace Updater
             Log("showerrors=" + IsShowErrors);
             Log("shownoupdate=" + IsShowNoUpdate);
 
-            // In info mode? Then show the main window
-            if (IsShowInfo)
-            {
-                ShowMe();
-            }
-
             // Do everything
             Work();
 
             Log("Finished");
 
-            // Not in info mode? Then terminate on return
-            if (IsShowInfo == false)
+            // Not visible? Then terminate on return
+            if (IsVisible() == false)
             {
                 Application.Exit();
             }
@@ -224,7 +224,7 @@ namespace Updater
                 else
                 {
                     Log("Download canceled");
-                    if (IsShowInfo == false) Application.Exit();
+                    if (IsVisible() == false) Application.Exit();
                     return;
                 }
 
@@ -381,6 +381,15 @@ namespace Updater
         {
             this.WindowState = FormWindowState.Normal;
             this.ShowInTaskbar = true;
+        }
+
+        /// <summary>
+        /// Check if our window is visible
+        /// </summary>
+        private bool IsVisible()
+        {
+            return (this.WindowState != FormWindowState.Minimized)
+                || (this.ShowInTaskbar);
         }
 
         /// <summary>
