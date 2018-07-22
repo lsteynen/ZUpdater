@@ -210,8 +210,8 @@ namespace Updater
                 Log("> A newer version is available");
 
                 // Ask to download or not
-                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " (v" + UpdateVersionString + ") is available." + Environment.NewLine + 
-                                                  "Do you want to download and install it?",
+                DialogResult dr = MessageBox.Show("A newer version of " + Config.name + " is available." + Environment.NewLine +
+                                                  "Do you want to download version " + UpdateVersionString + " and install it?",
                                   Caption,
                                   MessageBoxButtons.YesNo,
                                   MessageBoxIcon.Question);
