@@ -185,6 +185,7 @@ namespace Updater
             try
             {
                 ProcessUpdateInfoXml(UpdateXmlString);
+                LogMessage("Update server xml info file parsed");
             }
             catch (Exception ex)
             {
@@ -205,6 +206,8 @@ namespace Updater
             LogMessage("update_uri='" + UriToInstallerFile.ToString()+"'");
 
             // Compare update server version to our version
+            LogMessage("Compare version");
+
             // Version.CompareTo returns >0 if UpdateVersion > LocalVersion
             bool IsNewerAvailable = UpdateVersion.CompareTo(LocalVersion) > 0;
 
@@ -253,7 +256,7 @@ namespace Updater
                 wci.Dispose();
 
                 // Close running copies of the application before running the installer
-
+                LogMessage("Killing running application instances");
                 try
                 {
                     Process[] procs = Process.GetProcessesByName(Config.processname);
@@ -261,8 +264,7 @@ namespace Updater
                     {
                         foreach (Process proc in procs)
                         {
-                            LogMessage("Killing running instance");
-                            proc.Kill();
+                           proc.Kill();
                         }
                     }
                 }
@@ -276,7 +278,7 @@ namespace Updater
                 // Note:
                 // calling Process.Start(localInstallerPath) worked fine until an Admin-by-request update (v8.6.3).
                 // Now starting cmd.exe with /C seems a good alternative. JUst a pitty that we don't know if the installed started or not.
-
+                LogMessage("Start the installer");
                 try
                 {
                     ProcessStartInfo psi = new ProcessStartInfo
@@ -324,7 +326,7 @@ namespace Updater
         {
             CmdLine.CmdLine c = new CmdLine.CmdLine();
 
-            // In winforms we get the executable as the first argument. Handle it as a fixed first argument.
+            // In windows we get the executable as the first argument. Handle it as a fixed first argument.
             CmdLineString ArgExecutable = new CmdLineString("Executable", eUsage.Fixed, "Executable");
             CmdLineString ArgAppCurrentVersion = new CmdLineString("v", eUsage.Optional, "Application version number");
             CmdLineSwitch ArgShowInfo = new CmdLineSwitch("i", eUsage.Optional, "Show info");
