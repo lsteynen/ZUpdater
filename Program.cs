@@ -22,7 +22,7 @@ namespace Updater
             const string appName = "Updater";  
             bool createdNew;  
   
-            // allow to run only 1 instance!
+            // allow to run only 1 instance
             mutex = new Mutex(true, appName, out createdNew);  
             if (!createdNew)  
             {  
@@ -31,7 +31,9 @@ namespace Updater
             }
 
             if (Environment.OSVersion.Version.Major >= 6)
+            {
                 SetProcessDPIAware();
+            }
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

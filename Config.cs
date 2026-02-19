@@ -52,6 +52,7 @@ namespace Updater
             this.showinfo = tmpconfig.showinfo;
             this.showerrors = tmpconfig.showerrors;
             this.shownoupdate = tmpconfig.shownoupdate;
+
             sr.Close();
         }
 
@@ -60,6 +61,7 @@ namespace Updater
             XmlSerializerNamespaces ns = new XmlSerializerNamespaces();
             ns.Add("", ""); // avoid namespace in XML file
             XmlSerializer serializer = new XmlSerializer(typeof(Config));
+
             using ( TextWriter writer = new StreamWriter( file))
             {
                 serializer.Serialize(writer, this,ns);
