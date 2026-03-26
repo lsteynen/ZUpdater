@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<updater>
-  <version>2.0.99</version>
-  <!--file>..\Updaterlocation2\dir1\Setup ModbusControl.msi</file-->
-  <file>Setup ModbusControl.msi</file>
-</updater>

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Example Updater.xml file
+	 tells Updater the name of the application and where to look for an update.
+ -->
 <updater>
-  <caption>ModbusControl update</caption>
-  <name>ModbusControl</name>
-  <processname>ModbusControl</processname>
-  <infourl>C:\EDA\Updater\Updaterlocation\UpdaterInfo.xml</infourl>
+  <caption>Test1 update</caption>
+  <name>Test1</name>
+  <processname>Test1</processname>
+  <infourl>C:\Projects\Updater\Test-update-source-location\UpdaterInfo.xml</infourl>
 </updater>
