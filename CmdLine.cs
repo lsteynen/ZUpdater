@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Text;
 
 // Command line parameters processor
 // Supports:
@@ -11,7 +9,7 @@ using System.Text;
 
 namespace CmdLine
 {
-    public enum eUsage { Fixed = 0, Required, Optional };
+    public enum EUsage { Fixed = 0, Required, Optional };
 
     /// <summary>
     /// Represents an error occuring during command line parsing.
@@ -39,7 +37,7 @@ namespace CmdLine
     {
         private string _name;
         private string _value = "";
-        private eUsage _usage = eUsage.Optional;
+        private EUsage _usage = EUsage.Optional;
         private string _helpMessage = "";
         private bool _exists = false;
         protected bool _isSwitch = false;
@@ -50,7 +48,7 @@ namespace CmdLine
         /// <param name="name">Name of parameter.</param>
         /// <param name="required">Require that the parameter is present in the command line.</param>
         /// <param name="helpMessage">The explanation of the parameter to add to the help screen.</param>
-        public CmdLineParameter(string name, eUsage usage, string helpMessage)
+        public CmdLineParameter(string name, EUsage usage, string helpMessage)
         {
             _name = name;
             _usage = usage;
@@ -94,7 +92,7 @@ namespace CmdLine
         /// <summary>
         /// Returns if the parameter is fixed, required or optional
         /// </summary>
-        public eUsage Usage
+        public EUsage Usage
         {
             get { return _usage; }
         }
@@ -132,7 +130,7 @@ namespace CmdLine
         /// <param name="name">Name of parameter.</param>
         /// <param name="required">Require that the parameter is present in the command line.</param>
         /// <param name="helpMessage">The explanation of the parameter to add to the help screen.</param>
-        public CmdLineInt(string name, eUsage usage, string helpMessage)
+        public CmdLineInt(string name, EUsage usage, string helpMessage)
             : base(name, usage, helpMessage)
         {
         }
@@ -145,7 +143,7 @@ namespace CmdLine
         /// <param name="helpMessage">The explanation of the parameter to add to the help screen.</param>
         /// <param name="min">The minimum value of the parameter.</param>
         /// <param name="max">The maximum valie of the parameter.</param>
-        public CmdLineInt(string name, eUsage usage, string helpMessage, int min, int max)
+        public CmdLineInt(string name, EUsage usage, string helpMessage, int min, int max)
             : base(name, usage, helpMessage)
         {
             _min = min;
@@ -200,7 +198,7 @@ namespace CmdLine
     /// </summary>
     public class CmdLineString : CmdLineParameter
     {
-        public CmdLineString(string name, eUsage usage, string helpMessage)
+        public CmdLineString(string name, EUsage usage, string helpMessage)
             : base(name, usage, helpMessage)
         {
         }
@@ -215,7 +213,7 @@ namespace CmdLine
     /// </summary>
     public class CmdLineSwitch : CmdLineParameter
     {
-        public CmdLineSwitch(string name, eUsage usage, string helpMessage)
+        public CmdLineSwitch(string name, EUsage usage, string helpMessage)
             : base(name, usage, helpMessage)
         {
             _isSwitch = true;
@@ -344,12 +342,12 @@ namespace CmdLine
             // Check that fixed and required parameters are present in the command line. 
             foreach (string key in parameters.Keys)
             {
-                if ((parameters[key].Usage == eUsage.Fixed) && !parameters[key].Exists)
+                if ((parameters[key].Usage == EUsage.Fixed) && !parameters[key].Exists)
                 {
                     throw new CmdLineException(key, "Fixed argument is missing.");
                 }
 
-                if ((parameters[key].Usage == eUsage.Required) && !parameters[key].Exists)
+                if ((parameters[key].Usage == EUsage.Required) && !parameters[key].Exists)
                 {
                     throw new CmdLineException("-" + key, "Required parameter is missing.");
                 }
@@ -368,7 +366,7 @@ namespace CmdLine
 
             foreach (CmdLineParameter p in parameters.Values)
             {
-                if (p.Usage == eUsage.Fixed)
+                if (p.Usage == EUsage.Fixed)
                 {
                     if (index == FixedArgsCount)
                     {
@@ -400,7 +398,7 @@ namespace CmdLine
             // List the fixed arguments first, with "<..>", not '-'
             foreach (string key in parameters.Keys)
             {
-                if (parameters[key].Usage == eUsage.Fixed)
+                if (parameters[key].Usage == EUsage.Fixed)
                 {
                     string s = "<" + parameters[key].Name + ">";
                     while (s.Length < tab)
@@ -412,7 +410,7 @@ namespace CmdLine
             // then list other arguments
             foreach (string key in parameters.Keys)
             {
-                if (parameters[key].Usage != eUsage.Fixed)
+                if (parameters[key].Usage != EUsage.Fixed)
                 {
                     string s = "-" + parameters[key].Name;
                     while (s.Length < tab)
@@ -434,7 +432,7 @@ namespace CmdLine
     {
         public ConsoleCmdLine()
         {
-            base.RegisterParameter(new CmdLineSwitch("help", eUsage.Optional, "Prints the help screen."));
+            base.RegisterParameter(new CmdLineSwitch("help", EUsage.Optional, "Prints the help screen."));
         }
         public new string Parse(string[] args)
         {

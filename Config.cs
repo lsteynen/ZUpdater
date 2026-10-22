@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
 using System.IO;
@@ -13,7 +12,7 @@ namespace Updater
         // private
 
         // public
-        // the names of the public variables are also the XML tag names
+        // the names of the public variables are also the XML tag names (case sensitive)
 
         public string caption
         { get; set; }
@@ -27,45 +26,45 @@ namespace Updater
         public string version
         { get; set; }
 
-        public string infourl
+        public bool hidden
         { get; set; }
 
-        public bool showinfo
+        public bool showlog
         { get; set; }
 
-        public bool showerrors
-        { get; set; }
+        // can appear multiple times in the XML
+        [XmlElement("source")]
+        public List<Source> sources
+        { get; set; } = new List<Source>();
 
-        public bool shownoupdate
-        { get; set; }
+        // one <source> element
+        public class Source
+        {
+            // <source type="...">
+            [XmlAttribute("type")]
+            public string type
+            { get; set; }
+
+            public string location
+            { get; set; }
+        }
 
         public void Load(string file)
         {
             XmlSerializer xs = new XmlSerializer(typeof(Config));
-            StreamReader sr = new StreamReader(file);
-            Config tmpconfig = xs.Deserialize(sr) as Config;
+            Config tmpconfig;
+            using (StreamReader sr = new StreamReader(file))
+            {
+                tmpconfig = xs.Deserialize(sr) as Config;
+            }
+
             this.caption = tmpconfig.caption;
             this.name = tmpconfig.name;
             this.processname = tmpconfig.processname;
             this.version = tmpconfig.version;
-            this.infourl = tmpconfig.infourl;
-            this.showinfo = tmpconfig.showinfo;
-            this.showerrors = tmpconfig.showerrors;
-            this.shownoupdate = tmpconfig.shownoupdate;
-
-            sr.Close();
-        }
-
-        public void Save(string file)
-        {
-            XmlSerializerNamespaces ns = new XmlSerializerNamespaces();
-            ns.Add("", ""); // avoid namespace in XML file
-            XmlSerializer serializer = new XmlSerializer(typeof(Config));
-
-            using ( TextWriter writer = new StreamWriter( file))
-            {
-                serializer.Serialize(writer, this,ns);
-            }  
+            this.hidden = tmpconfig.hidden;
+            this.showlog = tmpconfig.showlog;
+            this.sources = tmpconfig.sources ?? new List<Source>();
         }
     }
 }

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows.Forms;
 using System.Threading;
 
@@ -19,14 +17,14 @@ namespace Updater
         [STAThread]
         static void Main()
         {
-            const string appName = "Updater";  
+            const string appName = "ZUpdater";  
             bool createdNew;  
   
             // allow to run only 1 instance
             mutex = new Mutex(true, appName, out createdNew);  
             if (!createdNew)  
             {  
-               //app is already running! Exiting the application  
+               // app is already running! Exiting the application  
                 return;  
             }
 
