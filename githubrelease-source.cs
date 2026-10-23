@@ -3,7 +3,9 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using static Updater.Config;
 
 namespace Updater
 {
@@ -42,14 +44,14 @@ namespace Updater
         /// Throw exception on error.
         /// </summary>
         /// <param name="url">URL github release latest</param>
-        public void GetData(string url)
+        public void GetData(string url, string assetpattern)
         {
             Log($"  Checking url '{url}'");
 
             // get the github release json text
             string json = GetLatestReleaseJsonAsync(url).GetAwaiter().GetResult();
 
-            ParseJson(json);
+            ParseJson(json, assetpattern);
         }
 
         private async Task<string> GetLatestReleaseJsonAsync(string url)
@@ -80,7 +82,7 @@ namespace Updater
         /// Parse the JSON string returned by the GitHub API for a release and extract the relevant information.
         /// Throw exception on error.
         /// /// </summary>
-        private void ParseJson(string json)
+        private void ParseJson(string json, string assetpattern)
         {
             Log($"  Parse json");
 
@@ -139,8 +141,8 @@ namespace Updater
 
                     Log($"  asset_name='{asset_name}', asset_download_url='{asset_browser_download_url}'");
 
-                    // first asset name that ends with ".msi" is the installer
-                    if (asset_name.EndsWith(".msi")) 
+                   // first asset name that matches pattern is the installer
+                    if (AssetNameMatchesPattern(asset_name, assetpattern))
                     {
                         this.asset_name = asset_name;
                         this.asset_browser_download_url = asset_browser_download_url;
@@ -151,7 +153,8 @@ namespace Updater
                     }
                 }
 
-                throw new Exception("No *.msi asset found in the GitHub release.");
+                // no matching asset found
+                throw new Exception("No asset name that matches <assetpattern>.");
             }
         }
 
@@ -213,6 +216,24 @@ namespace Updater
             }
 
             return version;
+        }
+
+        /// <summary>
+        /// Check if asset file name matches regex pattern.
+        /// Invalid regex expressions were caught in Config.cs.
+        /// </summary>
+        private bool AssetNameMatchesPattern(string name, string pattern)
+        {
+            Regex regex;
+            try
+            {
+                regex = new Regex(pattern);
+                return regex.IsMatch(name);
+            }
+            catch 
+            {
+                return false;
+            }
         }
 
         /// <summary>

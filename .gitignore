@@ -13,6 +13,9 @@
 *.sln.docstates
 *.env
 
+# Visual Studio 
+.vs/
+
 # Build results
 **/bin/
 **/obj/

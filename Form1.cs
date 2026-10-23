@@ -88,7 +88,7 @@ namespace Updater
             {
                 // config file error
                 // fatal
-                string errorText = $"ERROR: Could not load config file: {CleanNewline(ex.Message)}";
+                string errorText = $"ERROR: Invalid config file: {CleanNewline(ex.Message)}";
                 SetFatalError( errorText);
 
                 // show window with error 
@@ -98,20 +98,20 @@ namespace Updater
             }
 
             // Change window title if specified
-            if (String.IsNullOrEmpty(config.caption) == false)
+            if (String.IsNullOrEmpty(config.Caption) == false)
             {
-                windowCaption = config.caption;
+                windowCaption = config.Caption;
                 this.Text = windowCaption;
             }
 
             // add the config file switches
-            runHidden |= config.hidden;
-            showLog |= config.showlog;
+            runHidden |= config.Hidden;
+            showLog |= config.Showlog;
 
             // Take the application version number from the xml file if not specified on the command line
             if (applicationVersionString is null)
             {
-                applicationVersionString = config.version;
+                applicationVersionString = config.Version;
             }
             // version number given on command line or in xml file? 
             if (String.IsNullOrEmpty(applicationVersionString)
@@ -144,9 +144,9 @@ namespace Updater
             }
 
             // show info
-            LogMessage($"  caption='{config.caption}'");
-            LogMessage($"  name='{config.name}'");
-            LogMessage($"  processname='{config.processname}'");
+            LogMessage($"  caption='{config.Caption}'");
+            LogMessage($"  name='{config.Name}'");
+            LogMessage($"  processname='{config.ProcessName}'");
             LogMessage($"  appversion={applicationVersionString}");
             LogMessage($"  runhidden={runHidden}");
             LogMessage($"  showlog={showLog}");
@@ -396,7 +396,7 @@ namespace Updater
 
             // Ask to download and install
 
-            DialogResult dr = MessageBox.Show("A newer version of " + config.name + " is available." + Environment.NewLine +
+            DialogResult dr = MessageBox.Show("A newer version of " + config.Name + " is available." + Environment.NewLine +
                                               "Do you want to download version " + bestUpdate.version.ToString() + " and install it?",
                                   windowCaption,
                                   MessageBoxButtons.YesNo,
@@ -460,7 +460,7 @@ namespace Updater
 
             try
             {
-                Process[] procs = Process.GetProcessesByName(config.processname);
+                Process[] procs = Process.GetProcessesByName(config.ProcessName);
                 if (procs.Length >= 1)
                 {
                     foreach (Process proc in procs)
@@ -524,35 +524,22 @@ namespace Updater
 
             // Get the versions that are available on the update servers
             
-            if (config.sources.Count == 0)
-            {
-                LogMessage("ERROR: Update server sources are missing");
-                return found;
-            }
-
             // scan all sources for an update
-            foreach (var source in config.sources)
+            foreach (var source in config.Sources)
             {
                 // Blocking calls below can't be interrupted, so we check between sources
                 ct.ThrowIfCancellationRequested();
 
-                LogMessage($"Source: type='{source.type}' location='{source.location}'");
+                LogMessage($"Source: type='{source.Type}' location='{source.Location}'");
 
-                if (source.type == "fileshare")
+                if (source.Type == "fileshare")
                 {
-                    // check if we have a location
-                    if (String.IsNullOrEmpty(source.location) || (source.location.Trim() == String.Empty))
-                    {
-                        LogMessage("  ERROR: Update server source location is empty");
-                        continue;
-                    }
-
                     // create  a new UpdateInfoXmlSource object and get the data from the UpdaterInfo.xml file
                     UpdateInfoXmlSource fs = new UpdateInfoXmlSource();
                     fs.LogMessage += LogMessage;
                     try
                     {
-                        fs.GetData(source.location);
+                        fs.GetData(source.Location);
                     }
                     catch (Exception ex)
                     {
@@ -570,15 +557,15 @@ namespace Updater
                     else
                     {
                         // is relative path, combine with source location
-                        string sourceDir = Path.GetDirectoryName(source.location);
+                        string sourceDir = Path.GetDirectoryName(source.Location);
                         filePath = Path.Combine(sourceDir, fs.FilePath);
                     }
 
                     // add to list of found updates
                     found.Add(new UpdateFound
                     {
-                        type = source.type,
-                        location = source.location,
+                        type = source.Type,
+                        location = source.Location,
                         name = fs.FilePath,
                         versionStr = fs.VersionStr,
                         version = fs.Version,
@@ -586,26 +573,26 @@ namespace Updater
                         installerFileUrl = filePath
                     });
                 }
-                else if (source.type == "githubrelease")
+                else if (source.Type == "githubrelease")
                 {
                     // create a new GithubReleaseSource object and get the data from the github API
                     GithubReleaseSource ghr = new GithubReleaseSource();
                     ghr.LogMessage += LogMessage;
                     try
                     {
-                        ghr.GetData(source.location);
+                        ghr.GetData(source.Location, source.AssetPattern);
                     }
                     catch (Exception ex)
                     {
-                        LogMessage("  ERROR: Could not get the data from the github API: " + CleanNewline(ex.Message));
+                        LogMessage("  ERROR: Could not release from the github API: " + CleanNewline(ex.Message));
                         continue;
                     }
 
                     // add to list of found updates
                     found.Add(new UpdateFound
                     {
-                        type = source.type,
-                        location = source.location,
+                        type = source.Type,
+                        location = source.Location,
                         name = ghr.asset_name,
                         versionStr = ghr.VersionStr,
                         version = ghr.Version,
@@ -615,7 +602,7 @@ namespace Updater
                 }
                 else
                 {
-                    LogMessage($"  ERROR: Invalid update server source type: '{source.type}'");
+                    LogMessage($"  ERROR: Invalid update server source type: '{source.Type}'");
                 }
             }
 
